@@ -26,6 +26,9 @@ get_xml_content() {
 
 route53_hostedzone() {
 
+	local api_version uri host payload_hash auth_header
+	local response zones
+
 	api_version="2013-04-01"
 	uri="/$api_version/hostedzone"
 	host="route53.amazonaws.com"

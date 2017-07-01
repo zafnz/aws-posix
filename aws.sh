@@ -39,7 +39,7 @@ rootdir=$(dirname $0)
 . $rootdir/lib/common
 . $rootdir/lib/request
 . $rootdir/lib/route53
-. $rootdir/lib/test
+. $rootdir/lib/selftest
 
 # Globals:
 aws_timestamp=$(date -u '+%Y%m%dT%H%M%SZ' )
@@ -59,6 +59,7 @@ Outputs debugging information in debug.txt
 
 Avaialble commands:
 
+ *  test: self testing
  *  route53
 
 That is all. 
@@ -79,6 +80,9 @@ while [ -z "$exit" -a ! -z "$1" ]; do
 	--help) 
 		usage 
 		;;
+	--show-leaks)
+		show_leaks=1
+		;;
 	-*) 
 		echo "Unknown options"
 		usage 
@@ -95,10 +99,16 @@ cmd=$1
 shift
 
 case "$cmd" in
+"test") selftest "$@" ;;
 route53) route53 "$@" ;;
 test) selftest "$@" ;;
 *) usage ;;
 esac
 
+if [ "$show_leaks" = "1" ]; then
+	aws_secret_access_key=""
+	aws_access_key_id=""
+	set
+fi
 exit 0
 

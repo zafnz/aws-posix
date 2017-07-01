@@ -4,16 +4,18 @@
 selftest()
 {
 	# NOT ACTUALLY REAL KEYS
-	aws_secret_access_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" # NOT REAL
-	aws_access_key_id="AKIAIOSFODNN7EXAMPLE" # NOT REAL
-	aws_service="s3"
-	aws_region="us-east-1"
-	aws_timestamp="20150915T124500Z"
-	aws_date="20150915"
+	local aws_secret_access_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" # NOT REAL
+	local aws_access_key_id="AKIAIOSFODNN7EXAMPLE" # NOT REAL
+	local aws_service="s3"
+	local aws_region="us-east-1"
+	local aws_timestamp="20150915T124500Z"
+	local aws_date="20150915"
 
-	uri="/"
-	host="my-precious-bucket.s3.amazonaws.com"
+	local uri="/"
+	local host="my-precious-bucket.s3.amazonaws.com"
 	
+	local payload_hash auth_header test_key verify_header
+
 	payload_hash=$(printf "" | sha256)
 	
 	auth_header=$(make_authorization_header "GET" \
