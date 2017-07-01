@@ -8,6 +8,7 @@
 make_canonical_headers()
 {
 	local output=""
+	local h v
 	debug "Headers $*"
 	while [ "$1" != "" ]; do
 		h="$1"
@@ -34,6 +35,7 @@ make_canonical_headers()
 make_canonical_query()
 {
 	local output=""
+	local p v query
 	if [ -z "$1" ]; then
 		return
 	fi
@@ -67,7 +69,9 @@ make_creq() {
 	local can_headers="$4"
 	local payload_hash="$5"
 
-	local header_names=$(echon "$can_headers" | sed 's/:.*//' | tr '\n' ';')
+	local header_names creq
+
+	header_names=$(echon "$can_headers" | sed 's/:.*//' | tr '\n' ';')
 
 	# uri=$(uri_encode "$uri")
 
@@ -86,12 +90,12 @@ $payload_hash")
 # make_sts <region> <service> <creq-hash>
 # uses global $aws_timestamp and $aws_date
 make_sts() {
-	sts_date=$aws_date
-	sts_timestamp=$aws_timestamp
-	sts_region=$1
-	sts_service=$2	
-	sts_creq_hash=$3
-	sts_aws_sts="AWS4-HMAC-SHA256
+	local sts_date=$aws_date
+	local sts_timestamp=$aws_timestamp
+	local sts_region=$1
+	local sts_service=$2	
+	local sts_creq_hash=$3
+	local sts_aws_sts="AWS4-HMAC-SHA256
 $sts_timestamp
 ${sts_date}/${sts_region}/${sts_service}/aws4_request
 $sts_creq_hash"
@@ -100,14 +104,18 @@ $sts_creq_hash"
 }
 
 hmac_sha256() {
-	hmac_key="$1"
-	hmac_data="$2"
+	local hmac_key="$1"
+	local hmac_data="$2"
 	printf "%s" "$hmac_data" | openssl dgst -sha256 -mac HMAC -macopt "$hmac_key" | sed 's/^.* //'
 }
 
 make_signing_key() {
-	region="$1"
-	service="$2"
+	local region="$1"
+	local service="$2"
+
+	local sign_date_key sign_date_region_key 
+	local sign_date_region_service_key
+	local sign_key
 
 	debug "signing region $region service $service"
 	debug "key ${aws_secret_access_key}"
@@ -129,8 +137,8 @@ make_signing_key() {
 }
 
 calculate_signature() {
-	sig_data="$1"
-	sig_key="$2"
+	local sig_data="$1"
+	local sig_key="$2"
 	debugf "testing sig  == %s ==" "$sig_data"
 	debugf "testing key == %s ==" "$sig_key"
 	printf "%s" "$sig_data" | openssl dgst -sha256 \
@@ -141,20 +149,32 @@ calculate_signature() {
 
 
 make_authorization_header() {
-	method="$1"
-	host="$2"
-	uri="$3"
-	query_list="$4"
-	header_list="$5"
-	region="$6"
-	service="$7"
-	payload_hash="$8"
+	# Fuck global namespace
+	debug "in make_auth"
+
+	local method="$1"
+	local host="$2"
+	local uri="$3"
+	local query_list="$4"
+	local header_list="$5"
+	local region="$6"
+	local service="$7"
+	local payload_hash="$8"
+
+	local can_headers
+	local can_query
+	local creq_hash
+	local sts
+
+
+	debug "..var"
 
 	can_headers=$(make_canonical_headers \
 		$header_list \
 		x-amz-content-sha256 $payload_hash \
 		x-amz-date $aws_timestamp \
 		host $host)	
+	debug "headers..."
 	can_query=$(make_canonical_query $query_list)
 
 	creq_hash=$(make_creq $method "$uri" "$can_query" "$can_headers" "$payload_hash" | sha256)

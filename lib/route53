@@ -34,7 +34,8 @@ route53_hostedzone() {
 	host="route53.amazonaws.com"
 	
 	payload_hash=$(printf "" | sha256)
-	
+
+	debug "Calling make_authorizatio_header"	
 	auth_header=$(make_authorization_header "GET" \
 		"$host" \
 		"$uri" "" "" \
@@ -44,7 +45,7 @@ route53_hostedzone() {
 	debug "Running curl..."
 
 	response=$(debug_curl "https://${host}${uri}" \
-	-H "$auth_header"\
+	-H "$auth_header" \
 	-H "x-amz-content-sha256: $payload_hash" \
 	-H "x-amz-date: ${aws_timestamp}")
 	

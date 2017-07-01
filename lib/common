@@ -4,7 +4,6 @@
 aws_api_version="2016-09-15"
 aws_config_directory="$HOME/.aws"
 
-
 config_missing()
 {
 	echo "You haven't setup your aws config files."
@@ -48,7 +47,7 @@ debugf() {
 
 uri_encode() {
 	# Yeah I got this from some smart cookie, good idea I must say
-	
+	local data
 	data=$(curl -s -o /dev/null -w %{url_effective} --get \
 		--data-urlencode "$1" "")
 	printf "%s" "${data##/?}"
@@ -79,7 +78,7 @@ debug_curl() {
 		curl -i -s "$@"
 		return
 	fi
-	echo "curl"
+	echo "curl $@"
 	while [ ! -z "$1" ]; do
 		printf "\t%s\n" "$1"
 		shift
