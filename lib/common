@@ -1,0 +1,87 @@
+#!/bin/sh
+# Copyright 2017 Nick Clifford, GPLv3
+
+aws_api_version="2016-09-15"
+aws_config_directory="$HOME/.aws"
+
+
+config_missing()
+{
+	echo "You haven't setup your aws config files."
+	echo "In $aws_config_directory/credentials put:"
+	echo "aws_access_key_id = <key>"
+	echo "aws_secret_access_key = <secret>"
+	exit 1
+}	
+
+read_aws_config()
+{
+	[ -f "${aws_config_directory}/credentials" ] || config_missing
+
+	# Hey that aws config file looks vaugly like a shell setting
+	# lets make it that way.
+	eval $(cat ${aws_config_directory}/config | \
+		sed -e 's/\(.*\) = \(.*\)/aws_\1=\2/' -e 's/\[.*\]//')
+	eval $(cat ${aws_config_directory}/credentials | \
+		sed -e 's/\(.*\) = \(.*\)/\1=\2/' -e 's/\[.*\]//')
+
+	[ -z "$aws_region" ] && aws_region="us-east-1"
+	[ -z "$aws_access_key_id" ] && config_missing
+}		
+
+
+# Yup, echo -n isn't POSIX.
+# Nor is -e, but we don't need that.
+echon() {
+	printf '%s' "$*"
+}
+
+debug() {
+	echo "DEBUG: " $* >> debug.txt
+	
+}
+
+debugf() {
+	printf "$1" "$2" >> debug.txt 
+	printf '\n****\n' >> debug.txt
+}
+
+uri_encode() {
+	# Yeah I got this from some smart cookie, good idea I must say
+	
+	data=$(curl -s -o /dev/null -w %{url_effective} --get \
+		--data-urlencode "$1" "")
+	printf "%s" "${data##/?}"
+}
+
+sha256() {
+	openssl dgst -sha256 | sed 's/^.* //'
+}
+
+
+
+lower() {
+	echon "$*" | tr '[:upper:]' '[:lower:]'
+}
+
+
+trim_header_value() {
+	# Header values need to have white space trimmed.
+	#
+	# Blah:       a    b    c    \n
+	# becomes Blah: a b c\n
+	echon "$1" | sed -e 's/^ *//' -e 's/ *$//' -e 's/  */ /g'
+}
+
+# For debugging purposes
+debug_curl() {
+	if [ "$aws_dry_run" = "0" ]; then
+		curl -i -s "$@"
+		return
+	fi
+	echo "curl"
+	while [ ! -z "$1" ]; do
+		printf "\t%s\n" "$1"
+		shift
+	done
+}

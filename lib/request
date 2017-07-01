@@ -1,0 +1,176 @@
+#!/bin/sh
+# Copyright 2017 Nick Clifford, GPLv3
+#
+
+
+#
+# make_canonical_headers h1 v1 h2 v2 ...
+make_canonical_headers()
+{
+	local output=""
+	debug "Headers $*"
+	while [ "$1" != "" ]; do
+		h="$1"
+		shift
+		debug "Value: $1"
+		v=$(trim_header_value "$1")
+		debug "Trimed: $v"
+		shift
+
+		if [ "$output" != "" ]; then 
+			output=$(printf '%s\n%s' "$output" "$h:$v")
+		else
+			output="$h:$v"
+		fi
+	done
+	# sort time
+	debug "Headers: $output"
+	echon "$output" | sort -t :
+	
+}
+
+
+# make_canonical_query param1 value1 param2 value2 ...
+make_canonical_query()
+{
+	local output=""
+	if [ -z "$1" ]; then
+		return
+	fi
+	if [ -z "$2" ]; then
+		output=$(uri_encode "$1")
+		shift
+	fi
+	while [ "$1" != "" ]; do
+		p=$(uri_encode "$1")
+		shift
+		v=$(uri_encode "$1")
+		[ -z "$1" ] || shift
+
+		if [ "$output" != "" ]; then 
+			output=$(printf '%s\n%s' "$output" "$p $v")
+		else
+			output="$p $v"
+		fi
+	done
+	# sort time
+	query=$(echon "$output" | sort -t = | tr ' ' = | tr '\n' '&')
+	query="${query%?}"
+	echon "$query"
+}
+
+
+make_creq() {
+	local method="$1"
+	local uri="$2"
+	local can_query_string="$3"
+	local can_headers="$4"
+	local payload_hash="$5"
+
+	local header_names=$(echon "$can_headers" | sed 's/:.*//' | tr '\n' ';')
+
+	# uri=$(uri_encode "$uri")
+
+	creq=$(echo "$method
+$uri
+$can_query_string
+$can_headers
+
+$header_names
+$payload_hash")	
+	debugf "== CREQ: %s ==\n" "$creq"
+	printf '%s' "$creq"
+}
+
+
+# make_sts <region> <service> <creq-hash>
+# uses global $aws_timestamp and $aws_date
+make_sts() {
+	sts_date=$aws_date
+	sts_timestamp=$aws_timestamp
+	sts_region=$1
+	sts_service=$2	
+	sts_creq_hash=$3
+	sts_aws_sts="AWS4-HMAC-SHA256
+$sts_timestamp
+${sts_date}/${sts_region}/${sts_service}/aws4_request
+$sts_creq_hash"
+	debugf "STS: === %s ===\n" "$sts_aws_sts"
+	printf '%s' "$sts_aws_sts"
+}
+
+hmac_sha256() {
+	hmac_key="$1"
+	hmac_data="$2"
+	printf "%s" "$hmac_data" | openssl dgst -sha256 -mac HMAC -macopt "$hmac_key" | sed 's/^.* //'
+}
+
+make_signing_key() {
+	region="$1"
+	service="$2"
+
+	debug "signing region $region service $service"
+	debug "key ${aws_secret_access_key}"
+	
+
+	sign_date_key=$(hmac_sha256 \
+		key:"AWS4${aws_secret_access_key}" \
+		$aws_date)
+	sign_date_region_key=$(hmac_sha256 hexkey:${sign_date_key} $region)
+	sign_date_region_service_key=$(hmac_sha256 \
+		hexkey:${sign_date_region_key} \
+		$service)
+
+	sign_key=$(hmac_sha256 \
+		hexkey:$sign_date_region_service_key \
+		"aws4_request")
+	debug "signed key $sign_key"
+	echon $sign_key
+}
+
+calculate_signature() {
+	sig_data="$1"
+	sig_key="$2"
+	debugf "testing sig  == %s ==" "$sig_data"
+	debugf "testing key == %s ==" "$sig_key"
+	printf "%s" "$sig_data" | openssl dgst -sha256 \
+		-mac HMAC \
+		-macopt hexkey:${sig_key} | sed 's/^.* //'
+	
+}
+
+
+make_authorization_header() {
+	method="$1"
+	host="$2"
+	uri="$3"
+	query_list="$4"
+	header_list="$5"
+	region="$6"
+	service="$7"
+	payload_hash="$8"
+
+	can_headers=$(make_canonical_headers \
+		$header_list \
+		x-amz-content-sha256 $payload_hash \
+		x-amz-date $aws_timestamp \
+		host $host)	
+	can_query=$(make_canonical_query $query_list)
+
+	creq_hash=$(make_creq $method "$uri" "$can_query" "$can_headers" "$payload_hash" | sha256)
+	debug "TEST_CREQ_HASH: $creq_hash"
+
+	sts=$(make_sts "$region" "$service" $creq_hash)
+
+	signing_key=$(make_signing_key "$region" "$service")
+	debug "TEST_SIGNING_KEY: $signing_key"
+
+	signature=$(calculate_signature "$sts" "$signing_key")
+	debug "TEST_SIGNATURE: $signature"
+
+	auth_header="Authorization: AWS4-HMAC-SHA256 Credential=${aws_access_key_id}/${aws_date}/${region}/${service}/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=$signature"
+	
+	echo "$auth_header"
+}
+
+

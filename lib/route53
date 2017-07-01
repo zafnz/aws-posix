@@ -1,0 +1,90 @@
+#!/bin/sh
+# Copyright 2017 Nick Clifford, GPLv3
+
+
+route53_usage()
+{
+	echo "$0 route53 cmd [options...]
+
+list-hosted-zones
+get-hosted-zones
+
+"
+	exit 1
+}
+
+# Oh god i'm so sorry
+get_xml_content() {
+
+	tag="$1"
+	string="$2"
+	printf '%s' "$string" \
+		| sed "s:</$tag>:</$tag>\\n\\n:g" \
+		| sed -n "s:.*<$tag>\(.*\)</$tag>.*:\1:p"
+
+}
+
+route53_hostedzone() {
+
+	api_version="2013-04-01"
+	uri="/$api_version/hostedzone"
+	host="route53.amazonaws.com"
+	
+	payload_hash=$(printf "" | sha256)
+	
+	auth_header=$(make_authorization_header "GET" \
+		"$host" \
+		"$uri" "" "" \
+		"us-east-1" "route53" "$payload_hash")
+
+
+	debug "Running curl..."
+
+	response=$(debug_curl "https://${host}${uri}" \
+	-H "$auth_header"\
+	-H "x-amz-content-sha256: $payload_hash" \
+	-H "x-amz-date: ${aws_timestamp}")
+	
+	debug "Ran curl"
+	echo "$response"
+
+#	echo "Curl response: $response"
+	zones=$(get_xml_content "HostedZones" "$response")
+
+#	echo "Zones: $zones"
+#	echo ""
+#	echo ""
+#
+#	zone_list=$(get_xml_content "HostedZone" "$zones")
+#
+#	echo "zone.... $zone_list"	
+}
+
+r53_dispatch() {
+	echo $r53_commands | while [ read cmd p func help ]; do
+		
+	done
+
+}
+
+r53_commands="
+list-hosted-zones 0 r53_hostedzone help_r53_list_hosted_zones
+get-hosted-zone 1 r53_hostedzone help_r53_get_hosted_zones
+"
+
+route53() {
+	local cmd="$1"
+	[ -z "$cmd" ] && route53_usage
+	shift
+
+	case "$cmd" in
+	list-hosted-zones) 
+		route53_hostedzone
+		;;
+	get-hosted-zone) 
+		;;
+	*) 
+		route53_usage
+		 ;;
+	esac
+}
