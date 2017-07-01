@@ -50,10 +50,19 @@ read_aws_config
 
 
 usage() {
-	echo "$0 <command> [<options>]"
-	echo ""
-	echo "route53"
-	echo ""
+	echo "$0 <options> <command> [<command-options>]
+
+An AWS RESTful API client, written in POSIX shell.
+Outputs debugging information in debug.txt
+
+ --really     Actually does contact aws
+
+Avaialble commands:
+
+ *  route53
+
+That is all. 
+"
 	exit 1
 }
 

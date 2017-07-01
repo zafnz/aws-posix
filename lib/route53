@@ -60,13 +60,7 @@ route53_hostedzone() {
 #	echo "zone.... $zone_list"	
 }
 
-r53_dispatch() {
-	echo $r53_commands | while [ read cmd p func help ]; do
-		
-	done
-
-}
-
+# Hehe, writing a dispatcher... heh
 r53_commands="
 list-hosted-zones 0 r53_hostedzone help_r53_list_hosted_zones
 get-hosted-zone 1 r53_hostedzone help_r53_get_hosted_zones
